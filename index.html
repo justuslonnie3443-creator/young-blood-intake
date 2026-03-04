@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Young Blood — Who Are You?</title>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>
+  // ── EMAILJS SETUP — fill these in after creating your free account ──
+  const EMAILJS_PUBLIC_KEY  = 5gsze5b7WqczhL8Zs;   // Step 1
+  const EMAILJS_SERVICE_ID  = service_0l1to4x;   // Step 2
+  const EMAILJS_TEMPLATE_ID = template_dseh23r;  // Step 3
+  // ───────────────────────────────────────────────────────────────────
+  emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+</script>
 <style>
   :root {
     --red: #C1121F;
@@ -753,8 +762,8 @@
     </div>
 
     <div class="submit-area">
-      <button class="submit-btn" onclick="submitForm()">Submit →</button>
-      <p class="submit-note">Your answers go directly to your Young Blood leaders.<br>This isn't public. It's just between you and us.</p>
+      <button class="submit-btn" id="submit-btn" onclick="submitForm()">Submit →</button>
+      <p class="submit-note" id="submit-note">Your answers go directly to your Young Blood leaders.<br>This isn't public. It's just between you and us.</p>
     </div>
   </div>
 
@@ -837,9 +846,15 @@ document.querySelectorAll('textarea, input[type="text"]').forEach(el => {
   el.addEventListener('input', updateProgress);
 });
 
+
 // SUBMIT
-function submitForm() {
+async function submitForm() {
+  const btn = document.getElementById('submit-btn');
+  const note = document.getElementById('submit-note');
+
   const name = getTextValue('q_name') || 'Friend';
+  const age = getChipValue('q_age') || 'Not answered';
+  const tenure = getChipValue('q_tenure') || 'Not answered';
   const vibe = getChipValues('q_vibe');
   const cope = getChipValues('q_cope');
   const heavy = getChipValues('q_heavy');
@@ -850,33 +865,28 @@ function submitForm() {
   const faithReal = getSliderValue('q_faith_real');
   const godHard = getTextValue('q_god_hard');
   const purpose = getChipValue('q_purpose');
+  const gifted = getTextValue('q_gifted');
+  const pattern = getTextValue('q_pattern');
   const self = getChipValue('q_self');
   const peerPressure = getSliderValue('q_peer_pressure');
   const want = getChipValues('q_want');
   const openness = getSliderValue('q_openness');
+  const wish = getTextValue('q_wish');
+  const finalNote = getTextValue('q_final');
 
-  // SCORING ENGINE — maps answers to the 5 dimensions + Becoming Iron flags
-  const scores = {
-    spiritual: 5,
-    emotional: 5,
-    physical: 5,
-    mental_health: 5,
-    identity: 5
-  };
-
+  // SCORING ENGINE
+  const scores = { spiritual: 5, emotional: 5, physical: 5, mental_health: 5, identity: 5 };
   const flags = [];
 
-  // SPIRITUAL dimension
   if (spiritualPlace === 'close') scores.spiritual += 3;
-  if (['distant', 'confused', 'going_through', 'not_sure'].includes(spiritualPlace)) scores.spiritual -= 2;
+  if (['distant','confused','going_through','not_sure'].includes(spiritualPlace)) scores.spiritual -= 2;
   if (faithReal >= 7) scores.spiritual += 2;
   if (faithReal <= 3) scores.spiritual -= 2;
   if (purpose === 'yes_clear') scores.spiritual += 2;
-  if (['no', 'never_thought'].includes(purpose)) scores.spiritual -= 1;
+  if (['no','never_thought'].includes(purpose)) scores.spiritual -= 1;
   if (cope.includes('pray')) scores.spiritual += 1;
   if (want.includes('grow') || want.includes('answers')) scores.spiritual += 1;
 
-  // EMOTIONAL dimension
   if (vibe.some(v => ['tired','stressed','angry','anxious','heavy','lonely'].includes(v))) scores.emotional -= 2;
   if (cope.includes('explode') || cope.includes('nothing')) scores.emotional -= 2;
   if (cope.includes('talk')) scores.emotional += 2;
@@ -886,108 +896,133 @@ function submitForm() {
   if (['yes_family','yes_friend','yes_leader'].includes(trustPerson)) scores.emotional += 2;
   if (community === 'tension') scores.emotional -= 1;
 
-  // IDENTITY dimension (maps to Becoming Iron phases 3+4)
   if (['critical','disconnected','ashamed','empty'].includes(self)) scores.identity -= 3;
   if (self === 'confident') scores.identity += 3;
   if (peerPressure >= 8) scores.identity -= 2;
   if (peerPressure <= 3) scores.identity += 1;
   if (['yes_clear','yes_partial'].includes(purpose)) scores.identity += 2;
   if (heavy.includes('identity')) scores.identity -= 2;
-  if (heavy.includes('past')) { scores.identity -= 1; flags.push('carrying past wounds — Becoming Iron Phase 4 territory'); }
-  if (heavy.includes('habits')) { scores.identity -= 1; flags.push('named a pattern or habit — possible flesh-governed cycle'); }
+  if (heavy.includes('past')) { scores.identity -= 1; flags.push('Carrying past wounds — Becoming Iron Phase 4 territory'); }
+  if (heavy.includes('habits')) { scores.identity -= 1; flags.push('Named a pattern or habit — possible flesh-governed cycle'); }
 
-  // MENTAL HEALTH dimension
-  if (vibe.includes('numb') || vibe.includes('lonely')) { scores.mental_health -= 3; flags.push('numbness or loneliness flagged — check in privately'); }
-  if (cope.includes('nothing')) { scores.mental_health -= 2; }
+  if (vibe.includes('numb') || vibe.includes('lonely')) { scores.mental_health -= 3; flags.push('Numbness or loneliness flagged — check in privately'); }
+  if (cope.includes('nothing')) scores.mental_health -= 2;
   if (vibe.includes('anxious')) scores.mental_health -= 1;
-  if (trustPerson === 'no') { scores.mental_health -= 2; flags.push('no trusted person — high isolation risk'); }
-  if (openness <= 3) { scores.mental_health -= 1; flags.push('low openness to vulnerability — build trust first before group work'); }
+  if (trustPerson === 'no') { scores.mental_health -= 2; flags.push('No trusted person in their life — high isolation risk'); }
+  if (openness <= 3) { scores.mental_health -= 1; flags.push('Low openness to vulnerability — build trust before group work'); }
 
-  // PHYSICAL dimension (approximate from engagement/activity references)
   if (want.includes('fun') || want.includes('belong')) scores.physical += 1;
   if (community === 'family') scores.physical += 2;
   if (community === 'surface' || community === 'growing') scores.physical -= 1;
 
-  // Normalize
-  Object.keys(scores).forEach(k => {
-    scores[k] = Math.max(1, Math.min(10, scores[k]));
-  });
-
-  // RENDER RESULTS
-  document.getElementById('result-name-display').textContent = name;
-  document.getElementById('form-section').style.display = 'none';
-  const resultsEl = document.getElementById('results');
-  resultsEl.style.display = 'block';
+  Object.keys(scores).forEach(k => { scores[k] = Math.max(1, Math.min(10, scores[k])); });
 
   const dimInfo = [
-    { key: 'spiritual', label: 'Spiritual Sensitivity', color: '#C1121F',
-      notes: {
-        high: `${name} reports an active faith life. Good candidate for Delegation track or early leadership conversations.`,
-        mid: `Faith is present but fluctuating. Focus on building a consistent personal prayer and Word culture.`,
-        low: `Faith feels distant or performative. Prioritize personal conversations over programming. Meet them where they are.`
-      }
-    },
-    { key: 'emotional', label: 'Emotional Regulation', color: '#D4A017',
-      notes: {
-        high: `Emotional environment appears stable. ${name} has support structures in place.`,
-        mid: `Some stress or weight present. Regular check-ins are essential — don't wait for visible signs.`,
-        low: `Elevated emotional load. Consider whether Kingdom Court, a 1-on-1 conversation, or a professional referral is the right next step.`
-      }
-    },
-    { key: 'identity', label: 'Identity & Purpose', color: '#7c3aed',
-      notes: {
-        high: `${name} has a developing sense of Kingdom identity. Reinforce and name it. They may be ready for mentorship.`,
-        mid: `Identity is forming but not settled. This is prime time for Becoming Iron Phase 3 — speak their God-given identity over them directly.`,
-        low: `Significant identity gaps or self-critical patterns. Shame and past wounds may be present. Handle with care and consistency.`
-      }
-    },
-    { key: 'mental_health', label: 'Mental Health Stability', color: '#0891b2',
-      notes: {
-        high: `No significant flags. Keep consistent check-ins in place.`,
-        mid: `Some instability present. Ensure they feel seen. Normalize the conversation before it becomes a crisis.`,
-        low: `Notable instability flagged. Prioritize a private 1-on-1 with this teen before putting them in high-exposure ministry contexts.`
-      }
-    },
-    { key: 'physical', label: 'Community & Physical Fellowship', color: '#16a34a',
-      notes: {
-        high: `Relationally integrated. Use this teen to bring others in.`,
-        mid: `Still finding their place. Intentional inclusion in low-barrier physical activities will help.`,
-        low: `Not yet connected. Fellowship Chain applies — get them to a recreational event before a worship event.`
-      }
-    }
+    { key: 'spiritual',     label: 'Spiritual Sensitivity',   color: '#C1121F', notes: { high: 'Active faith life. Good candidate for Delegation track or early leadership conversations.', mid: 'Faith present but fluctuating. Build consistent personal prayer and Word culture.', low: 'Faith feels distant or performative. Prioritize personal conversations over programming.' } },
+    { key: 'emotional',     label: 'Emotional Regulation',    color: '#D4A017', notes: { high: 'Emotional environment stable. Support structures appear in place.', mid: 'Some stress or weight present. Regular check-ins essential — do not wait for visible signs.', low: 'Elevated emotional load. Consider Kingdom Court, 1-on-1, or professional referral.' } },
+    { key: 'identity',      label: 'Identity & Purpose',      color: '#7c3aed', notes: { high: 'Developing sense of Kingdom identity. Reinforce and name it. May be ready for mentorship.', mid: 'Identity forming but not settled. Prime time for Becoming Iron Phase 3.', low: 'Significant identity gaps or self-critical patterns. Shame and past wounds may be present.' } },
+    { key: 'mental_health', label: 'Mental Health Stability', color: '#0891b2', notes: { high: 'No significant flags. Keep consistent check-ins in place.', mid: 'Some instability present. Ensure they feel seen before it becomes a crisis.', low: 'Notable instability flagged. Prioritize a private 1-on-1 before high-exposure ministry contexts.' } },
+    { key: 'physical',      label: 'Community & Fellowship',  color: '#16a34a', notes: { high: 'Relationally integrated. Use this teen to bring others in.', mid: 'Still finding their place. Intentional inclusion in low-barrier activities will help.', low: 'Not yet connected. Fellowship Chain — get them to a recreational event before a worship event.' } }
   ];
+
+  // Build email body
+  let dimensionSummary = '';
+  dimInfo.forEach(d => {
+    const raw = scores[d.key];
+    const level = raw >= 7 ? 'HIGH' : raw >= 4 ? 'MODERATE' : 'LOW';
+    dimensionSummary += `${d.label}: ${raw}/10 (${level})\n${d.notes[level.toLowerCase()]}\n\n`;
+  });
+
+  let priorityText = flags.length > 0
+    ? 'FLAGS:\n• ' + flags.join('\n• ')
+    : 'No critical flags at this time. Continue regular check-ins.';
+  if (heavy.includes('mental')) priorityText += '\n\nNamed mental health as a current weight.';
+  if (heavy.includes('family')) priorityText += '\n\nNamed family as a current stressor.';
+  if (godHard) priorityText += `\n\nOn trusting God: "${godHard}"`;
+  if (gifted) priorityText += `\n\nGift they named: "${gifted}"`;
+  if (pattern) priorityText += `\n\nPattern they keep going back to: "${pattern}"`;
+  if (wish) priorityText += `\n\nWish a leader would ask about: "${wish}"`;
+  if (finalNote) priorityText += `\n\nAnything else: "${finalNote}"`;
+
+  const emailBody =
+`NEW YOUNG BLOOD INTAKE — ${name.toUpperCase()}
+Submitted: ${new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}
+Age: ${age}  |  Time in Young Blood: ${tenure}
+${'='.repeat(48)}
+
+DIMENSION SCORES
+${'─'.repeat(48)}
+${dimensionSummary}
+LEADER PRIORITY NOTES
+${'─'.repeat(48)}
+${priorityText}
+
+${'─'.repeat(48)}
+RAW RESPONSES
+${'─'.repeat(48)}
+Current vibe: ${vibe.join(', ') || 'Not answered'}
+How they cope: ${cope.join(', ') || 'Not answered'}
+What is heaviest: ${heavy.join(', ') || 'Not answered'}
+Home situation: ${home || 'Not answered'}
+Trusted person: ${trustPerson || 'Not answered'}
+Community feeling: ${community || 'Not answered'}
+Spiritual place: ${spiritualPlace || 'Not answered'}
+Faith feels real (1-10): ${faithReal}
+Sense of purpose: ${purpose || 'Not answered'}
+Self-perception: ${self || 'Not answered'}
+Peer influence (1-10): ${peerPressure}
+Vulnerability openness (1-10): ${openness}
+What they want from Young Blood: ${want.join(', ') || 'Not answered'}`;
+
+  // Sending state
+  btn.textContent = 'Sending...';
+  btn.disabled = true;
+  btn.style.opacity = '0.6';
+  note.textContent = 'Sending to your leaders now...';
+
+  try {
+    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      teen_name: name,
+      submission_date: new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' }),
+      report_body: emailBody,
+    });
+    showResults(name, scores, dimInfo, flags, heavy, godHard, gifted, pattern, wish);
+  } catch (err) {
+    console.error('EmailJS error:', err);
+    showResults(name, scores, dimInfo, flags, heavy, godHard, gifted, pattern, wish);
+    note.textContent = 'Heads up: there was an issue sending the email. Please screenshot this page and share it with your leader.';
+    note.style.color = '#e87722';
+  }
+}
+
+function showResults(name, scores, dimInfo, flags, heavy, godHard, gifted, pattern, wish) {
+  document.getElementById('result-name-display').textContent = name;
+  document.getElementById('form-section').style.display = 'none';
+  document.getElementById('results').style.display = 'block';
 
   let html = '';
   dimInfo.forEach(d => {
     const raw = scores[d.key];
     const pct = (raw / 10) * 100;
     const level = raw >= 7 ? 'high' : raw >= 4 ? 'mid' : 'low';
-    const noteText = d.notes[level];
     html += `
       <div class="dimension-card ${level}">
-        <div class="dim-title">
-          <span>${d.label}</span>
-          <span class="dim-score">${raw}/10</span>
-        </div>
-        <div class="dim-bar"><div class="dim-bar-fill" style="width:${pct}%; background:${d.color};"></div></div>
-        <div class="dim-notes">${noteText}</div>
+        <div class="dim-title"><span>${d.label}</span><span class="dim-score">${raw}/10</span></div>
+        <div class="dim-bar"><div class="dim-bar-fill" style="width:${pct}%;background:${d.color};"></div></div>
+        <div class="dim-notes">${d.notes[level]}</div>
       </div>`;
   });
-
   document.getElementById('dimension-results').innerHTML = html;
 
-  // LEADER PRIORITY TEXT
-  let priority = '';
-  if (flags.length > 0) {
-    priority = `<strong>Flags to follow up on:</strong><br>• ${flags.join('<br>• ')}`;
-  } else {
-    priority = `No critical flags at this time. Continue regular check-ins and watch for changes over the next 30 days.`;
-  }
-
-  if (heavy.includes('mental')) priority += `<br><br>Named mental health as a current weight. Don't wait for them to bring it up again.`;
-  if (heavy.includes('family')) priority += `<br><br>Named family as a current stressor. Home environment may be affecting their capacity to engage.`;
-  if (godHard) priority += `<br><br><strong>Their own words on what makes it hard to trust God:</strong> "${godHard}"`;
-
+  let priority = flags.length > 0
+    ? `<strong>Flags to follow up on:</strong><br>• ${flags.join('<br>• ')}`
+    : 'No critical flags at this time. Continue regular check-ins and watch for changes over the next 30 days.';
+  if (heavy.includes('mental')) priority += '<br><br>Named mental health as a current weight. Don\'t wait for them to bring it up again.';
+  if (heavy.includes('family')) priority += '<br><br>Named family as a current stressor. Home environment may be affecting their capacity to engage.';
+  if (godHard) priority += `<br><br><strong>On trusting God:</strong> "${godHard}"`;
+  if (gifted) priority += `<br><br><strong>Gift they named:</strong> "${gifted}"`;
+  if (pattern) priority += `<br><br><strong>Pattern they keep going back to:</strong> "${pattern}"`;
+  if (wish) priority += `<br><br><strong>What they wish a leader would ask:</strong> "${wish}"`;
   document.getElementById('leader-priority-text').innerHTML = priority;
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
